@@ -37,6 +37,9 @@ def get_champs_details(PATCH_ID, lang, champId):
     data = res.json()
     return data["data"][champId]
 
+def sanitizeBurn(cdBurn):
+    return cdBurn.replace("/", "</td><td>")
+
 def champ_card_content(PATCH_ID, champ, display=False):
     if (not display):
         return ""
@@ -52,43 +55,67 @@ def champ_card_content(PATCH_ID, champ, display=False):
     </div>
     <hr style="border: 1px solid #c4c4a5; border-radius: 50px">
     <div style="padding: 10px">
-        <div style="display: flex; flex-flow: row nowrap; gap: 20px">
+        <div style="display: flex; flex-flow: row nowrap; gap: 20px; align-items: center;">
             <img src="https://ddragon.leagueoflegends.com/cdn/{PATCH_ID}/img/spell/{champ["spells"][0]["image"]["full"]}" style="border-radius: 6px;">
             <h3 style="flex: 1">(Q) {champ["spells"][0]["name"]}</h3>
+            <table style="color:#fff4bf; text-align: center; border-collapse: collapse">
+                <tr><th style="text-align: left;">CD</th><td>{sanitizeBurn(champ["spells"][0]["cooldownBurn"])}</td></tr>
+                <tr><th style="text-align: left; padding-right: 10px">COST</th><td>{sanitizeBurn(champ["spells"][0]["costBurn"])}</td></tr>
+            </table>
         </div>
         <div style="margin-top: 10px;">{champ["spells"][0]["description"]}</div>
     </div>
     <hr style="border: 1px solid #c4c4a5; border-radius: 50px">
     <div style="padding: 10px">
-        <div style="display: flex; flex-flow: row nowrap; gap: 20px">
+        <div style="display: flex; flex-flow: row nowrap; gap: 20px; align-items: center;">
             <img src="https://ddragon.leagueoflegends.com/cdn/{PATCH_ID}/img/spell/{champ["spells"][1]["image"]["full"]}" style="border-radius: 6px;">
             <h3 style="flex: 1">(W) {champ["spells"][1]["name"]}</h3>
+            <table style="color:#fff4bf; text-align: center; border-collapse: collapse">
+                <tr><th style="text-align: left;">CD</th><td>{sanitizeBurn(champ["spells"][1]["cooldownBurn"])}</td></tr>
+                <tr><th style="text-align: left; padding-right: 10px">COST</th><td>{sanitizeBurn(champ["spells"][1]["costBurn"])}</td></tr>
+            </table>
         </div>
         <div style="margin-top: 10px;">{champ["spells"][1]["description"]}</div>
     </div>
     <hr style="border: 1px solid #c4c4a5; border-radius: 50px">
     <div style="padding: 10px">
-        <div style="display: flex; flex-flow: row nowrap; gap: 20px">
+        <div style="display: flex; flex-flow: row nowrap; gap: 20px; align-items: center;">
             <img src="https://ddragon.leagueoflegends.com/cdn/{PATCH_ID}/img/spell/{champ["spells"][2]["image"]["full"]}" style="border-radius: 6px;">
             <h3 style="flex: 1">(E) {champ["spells"][2]["name"]}</h3>
+            <table style="color:#fff4bf; text-align: center; border-collapse: collapse">
+                <tr><th style="text-align: left;">CD</th><td>{sanitizeBurn(champ["spells"][2]["cooldownBurn"])}</td></tr>
+                <tr><th style="text-align: left; padding-right: 10px">COST</th><td>{sanitizeBurn(champ["spells"][2]["costBurn"])}</td></tr>
+            </table>
         </div>
         <div style="margin-top: 10px;">{champ["spells"][2]["description"]}</div>
     </div>
     <hr style="border: 1px solid #c4c4a5; border-radius: 50px">
     <div style="padding: 10px">
-        <div style="display: flex; flex-flow: row nowrap; gap: 20px">
+        <div style="display: flex; flex-flow: row nowrap; gap: 20px; align-items: center;">
             <img src="https://ddragon.leagueoflegends.com/cdn/{PATCH_ID}/img/spell/{champ["spells"][3]["image"]["full"]}" style="border-radius: 6px;">
             <h3 style="flex: 1">(R) {champ["spells"][3]["name"]}</h3>
+            <table style="color:#fff4bf; text-align: center; border-collapse: collapse">
+                <tr><th style="text-align: left;">CD</th><td>{sanitizeBurn(champ["spells"][3]["cooldownBurn"])}</td></tr>
+                <tr><th style="text-align: left; padding-right: 10px">COST</th><td>{sanitizeBurn(champ["spells"][3]["costBurn"])}</td></tr>
+            </table>
         </div>
         <div style="margin-top: 10px;">{champ["spells"][3]["description"]}</div>
     </div>
-</div>"""
+</div>
+<style>
+td {{
+    padding-inline: 10px;
+}}
+td:not(:last-child) {{
+    border-right: 1px solid #c4c4a5;
+}}
+</style>"""
 
 def build_champ_card(PATCH_ID, champ, verso=False):
     # return the html of a champ's card
     return f"""
 <div style="text-align: left; background-color: #221f40; padding: 10px; border-radius: 8px; width: max-content; width: 700px; margin: 25px auto; border: 1px solid #c4c4a5">
-    <div style="display: flex; flex-flow: row nowrap; align-items: center; gap: 20px; padding-bottom: 10px;">
+    <div style="display: flex; flex-flow: row nowrap; align-items: center; gap: 20px;{" padding-bottom: 10px;" if verso else ""}">
         <img src="https://ddragon.leagueoflegends.com/cdn/{PATCH_ID}/img/champion/{champ["image"]["full"]}" style="border-radius: 6px;">
         <div style="display: flex; flex-flow: column nowrap; gap: 5px">
             <h2 style="color:#d39542; margin-block: 0px; padding-block: 0px">{champ["id"]}</h2>

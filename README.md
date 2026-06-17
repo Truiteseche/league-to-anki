@@ -38,6 +38,12 @@ Below is a list of the languages supported by Data Dragon, which you can also re
 | zh_CN | Chinese (China) |
 | zh_TW | Chinese (Taiwan) |
 
+## Run the script
+
+- Custom the cards in `config.json` to fit your needs
+- Run `pip install -r requirements.txt` to install required packages
+- Run `python ./main.py` to generate the anki deck
+
 ## Customization options
 
 - Language

@@ -1,4 +1,3 @@
-import requests
 # from dotenv import load_dotenv
 # import os
 from utils import *
@@ -18,5 +17,5 @@ champs = get_champs_list(PATCH_ID, lang)
 for i in range(len(champs)):
     print(i, champs[i]["id"])
 
-detailedChamp = get_champs_details(PATCH_ID, lang, champs[125]["id"])
+detailedChamp = get_champs_details(PATCH_ID, lang, champs[25]["id"])
 print(build_champ_card(PATCH_ID, detailedChamp, True))
