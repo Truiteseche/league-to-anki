@@ -16,4 +16,7 @@ print("language:", lang)
 champs = get_champs_list(PATCH_ID, lang)
 
 for i in range(len(champs)):
-    print(build_champ_card(PATCH_ID, champs[i]))
+    print(i, champs[i]["id"])
+
+detailedChamp = get_champs_details(PATCH_ID, lang, champs[125]["id"])
+print(build_champ_card(PATCH_ID, detailedChamp, True))

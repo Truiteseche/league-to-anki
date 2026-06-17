@@ -40,8 +40,10 @@ Below is a list of the languages supported by Data Dragon, which you can also re
 
 ## Customization options
 
-- Edit the scheme of the cards
+- Language
+<!-- - Edit the scheme of the cards
 - Whitelist champions/items
 - Include gameplay videos
+- Include champ blurb (lore)
 - Include EnnemyTips and AllyTips
-- ...
+- ... -->
