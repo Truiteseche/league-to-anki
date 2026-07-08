@@ -38,18 +38,54 @@ Below is a list of the languages supported by Data Dragon, which you can also re
 | zh_CN | Chinese (China) |
 | zh_TW | Chinese (Taiwan) |
 
-## Run the script
+## Usage
 
-- Custom the cards in `config.json` to fit your needs
-- Run `pip install -r requirements.txt` to install required packages
-- Run `python ./main.py` to generate the anki deck
+```bash
+pip install -r requirements.txt
+python main.py
+```
 
-## Customization options
+### CLI Options
 
-- Language
-<!-- - Edit the scheme of the cards
-- Whitelist champions/items
-- Include gameplay videos
-- Include champ blurb (lore)
-- Include EnnemyTips and AllyTips
-- ... -->
+| Option | Description |
+|--------|-------------|
+| `--lang`, `-l` | Language locale (e.g. `en_US`, `ko_KR`) |
+| `--output`, `-o` | Output `.apkg` filename |
+| `--champions` | Only include specific champions (space-separated) |
+| `--exclude` | Exclude specific champions (space-separated) |
+| `--no-items` | Skip the item deck |
+| `--workers` | Parallel workers for fetching (default: 20) |
+
+### Configuration
+
+All options in `config.json` are optional. CLI flags override config values.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `language` | string | `"en_US"` | Language locale |
+| `items` | bool | `true` | Include item deck |
+| `champions_only` | string[] | — | Whitelist champions |
+| `champions_exclude` | string[] | — | Exclude champions |
+| `output` | string | auto | Output filename (`LoL_{patch}_{lang}.apkg`) |
+| `deck_name` | string | `"League of Legends"` | Anki deck name |
+| `champion_card` | object | — | Section layout for champion cards |
+| `item_card` | object | — | Section layout for item cards |
+
+#### Customizing card sections
+
+Both `champion_card` and `item_card` accept `front` and `back` arrays to control which sections appear on each side of the card.
+
+**Champion sections:** `header`, `abilities`, `lore`, `stats`, `info`, `tips`
+
+**Item sections:** `header`, `stats`, `description`, `build_path`, `gold`
+
+Example — show lore on front and tips on back:
+
+```json
+{
+    "champion_card": {
+        "front": ["header", "lore"],
+        "back": ["header", "stats", "tips"]
+    }
+}
+```
