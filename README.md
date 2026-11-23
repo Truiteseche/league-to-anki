@@ -38,6 +38,8 @@ Below is a list of the languages supported by Data Dragon, which you can also re
 | zh_CN | Chinese (China) |
 | zh_TW | Chinese (Taiwan) |
 
+Stat and gold icons on item cards come from [CommunityDragon](https://www.communitydragon.org/); they are downloaded once into `.cache/icons` and bundled into the items `.apkg`, so they work offline.
+
 ## Usage
 
 ```bash
@@ -45,15 +47,21 @@ pip install -r requirements.txt
 python main.py
 ```
 
+This writes two packages that you can import separately into Anki: `LoL_{patch}_{lang}_champions.apkg` and `LoL_{patch}_{lang}_items.apkg`. Both decks land under the same parent deck (`deck_name`).
+
 ### CLI Options
 
 | Option | Description |
-|--------|-------------|
+| ------ | ----------- |
 | `--lang`, `-l` | Language locale (e.g. `en_US`, `ko_KR`) |
-| `--output`, `-o` | Output `.apkg` filename |
+| `--output`, `-o` | Base output name: writes `<name>_champions.apkg` and `<name>_items.apkg` |
 | `--champions` | Only include specific champions (space-separated) |
-| `--exclude` | Exclude specific champions (space-separated) |
-| `--no-items` | Skip the item deck |
+| `--excludeChampions` | Exclude specific champions (space-separated) |
+| `--onlyChampions` | Skip the item deck |
+| `--items` | Only include specific items, by id or name (space-separated) |
+| `--excludeItems` | Exclude specific items, by id or name (space-separated) |
+| `--onlyItems` | Skip the champions deck |
+| `--englishNames` | Show the English item name in parentheses next to the localized one |
 | `--workers` | Parallel workers for fetching (default: 20) |
 
 ### Configuration
@@ -61,12 +69,16 @@ python main.py
 All options in `config.json` are optional. CLI flags override config values.
 
 | Key | Type | Default | Description |
-|-----|------|---------|-------------|
+| --- | ---- | ------- | ----------- |
 | `language` | string | `"en_US"` | Language locale |
-| `items` | bool | `true` | Include item deck |
-| `champions_only` | string[] | — | Whitelist champions |
+| `output` | string | auto | Base output name (`LoL_{patch}_{lang}`), suffixed with `_champions.apkg` / `_items.apkg` |
+| `champions` | string[] | — | Whitelist champions |
 | `champions_exclude` | string[] | — | Exclude champions |
-| `output` | string | auto | Output filename (`LoL_{patch}_{lang}.apkg`) |
+| `only_champions` | bool | `false` | Skip the items deck |
+| `items` | string[] | — | Whitelist items (id or name) |
+| `items_exclude` | string[] | — | Exclude items (id or name) |
+| `only_items` | bool | `false` | Skip the champions deck |
+| `english_names` | bool | `false` | Show the English item name in parentheses (ignored for `en_*` languages) |
 | `deck_name` | string | `"League of Legends"` | Anki deck name |
 | `champion_card` | object | — | Section layout for champion cards |
 | `item_card` | object | — | Section layout for item cards |

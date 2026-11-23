@@ -41,6 +41,24 @@ def http_get_json(url, retries=3, timeout=15, cache_ttl=CACHE_TTL):
                 raise
             time.sleep(2 ** attempt)
 
+def http_get_file(url, dest, retries=3, timeout=15):
+    """Download a binary file to `dest` unless it already exists. Returns the path."""
+    dest = Path(dest)
+    if dest.exists() and dest.stat().st_size > 0:
+        return dest
+    dest.parent.mkdir(parents=True, exist_ok=True)
+
+    for attempt in range(retries):
+        try:
+            res = requests.get(url, timeout=timeout)
+            res.raise_for_status()
+            dest.write_bytes(res.content)
+            return dest
+        except requests.exceptions.RequestException:
+            if attempt == retries - 1:
+                raise
+            time.sleep(2 ** attempt)
+
 _CONFIG_CACHE = None
 
 def load_config():
@@ -58,10 +76,6 @@ def load_config():
     except json.JSONDecodeError:
         _CONFIG_CACHE = {}
         return _CONFIG_CACHE
-
-def get_language(default: str = "en_US"):
-    cfg = load_config()
-    return cfg.get("language", default)
 
 def get_patch_id():
     data = http_get_json("https://ddragon.leagueoflegends.com/api/versions.json")

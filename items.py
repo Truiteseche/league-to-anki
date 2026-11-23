@@ -1,5 +1,72 @@
 import re
-from utils import http_get_json, load_config
+from utils import http_get_json, http_get_file, load_config, CACHE_DIR
+
+CDRAGON_STATS_URL = (
+    "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/"
+    "global/default/assets/ux/fonts/texticons/lol/statsicon/"
+)
+GOLD_ICON_URL = "https://raw.communitydragon.org/latest/game/assets/ux/floatingtext/goldicon.png"
+ICONS_DIR = CACHE_DIR / "icons"
+GOLD_ICON = "lol_gold.png"
+
+# English stat name (as written in en_US item descriptions) -> CommunityDragon icon name.
+# Stat names are localized, so localized stats are matched to these by position.
+STAT_ICONS = {
+    "Health": "scalehealth",
+    "Ability Haste": "scaleah",
+    "Ability Power": "scaleap",
+    "Attack Damage": "scalead",
+    "Move Speed": "scalems",
+    "Armor": "scalearmor",
+    "Base Mana Regen": "scalemanaregen",
+    "Mana": "scalemana",
+    "Magic Resist": "scalemr",
+    "Attack Speed": "scaleas",
+    "Critical Strike Chance": "scalecrit",
+    "Critical Strike Damage": "scalecritmult",
+    "Base Health Regen": "scalehpregen",
+    "Heal and Shield Power": "scalehealshield",
+    "Lethality": "scaleapen",
+    "Armor Penetration": "scaleapen",
+    "Magic Penetration": "scalempen",
+    "Life Steal": "scalels",
+    "Omnivamp": "scalesv",
+    "Tenacity": "scaletenacity",
+    "Adaptive Force": "scaleadaptiveforce",
+}
+GOLD_STATS = {"Gold Per 10 Seconds"}
+
+
+def _stat_media_name(icon):
+    # Anki media filenames are global to the collection, so keep them prefixed.
+    return f"lol_stat_{icon}.png"
+
+
+def ensure_icons():
+    """Download stat and gold icons into the cache. Returns their paths for genanki media_files."""
+    paths = [str(http_get_file(GOLD_ICON_URL, ICONS_DIR / GOLD_ICON))]
+    for icon in sorted(set(STAT_ICONS.values())):
+        dest = ICONS_DIR / _stat_media_name(icon)
+        paths.append(str(http_get_file(f"{CDRAGON_STATS_URL}{icon}.png", dest)))
+    return paths
+
+
+def _icon_img(filename, size=16):
+    return f'<img src="{filename}" style="height: {size}px; width: {size}px; vertical-align: middle">'
+
+
+def stat_icon_html(en_name):
+    if en_name in GOLD_STATS:
+        return _icon_img(GOLD_ICON)
+    icon = STAT_ICONS.get(en_name)
+    return _icon_img(_stat_media_name(icon)) if icon else ""
+
+
+def gold_html(amount, color="#FFD700", size=16):
+    return (
+        f'<span style="color: {color}; white-space: nowrap">'
+        f'{_icon_img(GOLD_ICON, size)} {amount}</span>'
+    )
 
 TAG_COLORS = {
     "Damage": "#C62828",
@@ -31,6 +98,15 @@ TAG_COLORS = {
 def get_items_list(PATCH_ID, lang):
     url = f"https://ddragon.leagueoflegends.com/cdn/{PATCH_ID}/data/{lang}/item.json"
     raw = http_get_json(url)["data"]
+    if lang == "en_US":
+        en = raw
+    else:
+        en = http_get_json(f"https://ddragon.leagueoflegends.com/cdn/{PATCH_ID}/data/en_US/item.json")["data"]
+
+    for item_id, item in raw.items():
+        en_item = en.get(item_id, {})
+        item["_en_name"] = en_item.get("name", "")
+        item["_en_stats"] = [name for name, _ in parse_stats_from_description(en_item.get("description", ""))]
 
     items = []
     for item_id, item in raw.items():
@@ -119,7 +195,7 @@ def convert_riot_html(description):
             parts_html.append(
                 f'<div style="background: {bg}; border-left: 3px solid {color}; '
                 f'padding: 8px; margin: 8px 0; border-radius: 4px">'
-                f'<strong style="color: {color}; font-size: 15px">{ability_name}</strong><br>'
+                f'<strong style="color: {color}; font-size: 15px">{ability_name}</strong>'
                 f'{rest}'
             )
             section_open = True
@@ -199,7 +275,10 @@ def render_tree_html(node, PATCH_ID, depth=0):
 
     img = f"https://ddragon.leagueoflegends.com/cdn/{PATCH_ID}/img/item/{node['image']}"
     has_children = bool(node["children"])
-    combine_str = f" <span style='color: #666; font-size: 13px'>({node['combine']}g)</span>" if has_children else ""
+    combine_str = (
+        f"<span style='color: #888; font-size: 13px'>(+{gold_html(node['combine'], '#888', 13)})</span>"
+        if has_children else ""
+    )
 
     children_html = ""
     if has_children:
@@ -213,22 +292,28 @@ def render_tree_html(node, PATCH_ID, depth=0):
         <div style="display: flex; align-items: center; gap: 8px; padding: 3px 0">
             <img src="{img}" style="width: 24px; height: 24px; border-radius: 3px">
             <span style="color: #e8e0d0; font-size: 14px">{node['name']}</span>
-            <span style="color: #FFD700; font-size: 14px">{node['total']}g</span>
+            <span style="font-size: 14px">{gold_html(node['total'])}</span>
             {combine_str}
         </div>
         {children_html}
     </div>"""
 
 
-def _item_stats(item):
+def _item_stats(PATCH_ID, item, all_items, opts):
     stats = parse_stats_from_description(item.get("description", ""))
     if not stats:
         return ""
+    en_stats = item.get("_en_stats", [])
+    # Localized and English stats are listed in the same order; only trust the match if the counts agree.
+    if len(en_stats) != len(stats):
+        en_stats = [None] * len(stats)
     rows = []
-    for name, value in stats:
+    for (name, value), en_name in zip(stats, en_stats):
+        icon = stat_icon_html(en_name) if en_name else ""
         rows.append(
-            f"<tr><td style='padding-right: 15px; color: #87CEEB'>{name}</td>"
-            f"<td style='color: #fff4bf'>{value}</td></tr>"
+            f"<tr><td style='padding-right: 8px; width: 16px'>{icon}</td>"
+            f"<td style='padding-right: 15px; color: #fff4bf'>{value}</td>"
+            f"<td style='color: #87CEEB'>{name}</td></tr>"
         )
     return f"""
 <div style="padding: 10px">
@@ -237,23 +322,27 @@ def _item_stats(item):
 </div>"""
 
 
-ITEM_SECTIONS["stats"] = lambda PATCH_ID, item, all_items: _item_stats(item)
+ITEM_SECTIONS["stats"] = _item_stats
 
 
-def _item_header(PATCH_ID, item, all_items):
+def _item_header(PATCH_ID, item, all_items, opts):
     img = f"https://ddragon.leagueoflegends.com/cdn/{PATCH_ID}/img/item/{item['image']['full']}"
+    en_name = item.get("_en_name", "")
+    en_html = ""
+    if opts.get("english_names") and en_name and en_name != item["name"]:
+        en_html = f' <span style="color: #a09a8a; font-size: 16px; font-weight: normal">({en_name})</span>'
     return f"""
 <div style="text-align: center">
     <img src="{img}" style="border-radius: 6px; width: 64px; height: 64px">
-    <h2 style="color: #d39542; margin-block: 10px">{item['name']}</h2>
-    <div style="color: #FFD700; font-size: 20px">{item['gold']['total']}g</div>
+    <h2 style="color: #d39542; margin-block: 10px">{item['name']}{en_html}</h2>
+    <div style="font-size: 20px">{gold_html(item['gold']['total'], size=20)}</div>
 </div>"""
 
 
 ITEM_SECTIONS["header"] = _item_header
 
 
-def _item_description(PATCH_ID, item, all_items):
+def _item_description(PATCH_ID, item, all_items, opts):
     description_html = convert_riot_html(item.get("description", ""))
     if not description_html:
         return ""
@@ -267,7 +356,7 @@ def _item_description(PATCH_ID, item, all_items):
 ITEM_SECTIONS["description"] = _item_description
 
 
-def _item_build_path(PATCH_ID, item, all_items):
+def _item_build_path(PATCH_ID, item, all_items, opts):
     from_ids = item.get("from", [])
     if not from_ids:
         return ""
@@ -283,7 +372,7 @@ def _item_build_path(PATCH_ID, item, all_items):
 ITEM_SECTIONS["build_path"] = _item_build_path
 
 
-def _item_gold(PATCH_ID, item, all_items):
+def _item_gold(PATCH_ID, item, all_items, opts):
     gold = item["gold"]
     total = gold["total"]
     base = gold["base"]
@@ -292,10 +381,10 @@ def _item_gold(PATCH_ID, item, all_items):
 <div style="padding: 10px">
     <h3 style="color: #d39542; margin-block: 5px">Gold</h3>
     <table style="color: #fff4bf; border-collapse: collapse">
-        <tr><td style="padding-right: 15px">Total</td><td style="color: #FFD700">{total}g</td></tr>
-        <tr><td style="padding-right: 15px">Components</td><td style="color: #888">{components_cost}g</td></tr>
-        <tr><td style="padding-right: 15px">Combine Cost</td><td style="color: #87CEEB">{base}g</td></tr>
-        <tr><td style="padding-right: 15px">Sell Value</td><td style="color: #888">{gold['sell']}g</td></tr>
+        <tr><td style="padding-right: 15px">Total</td><td>{gold_html(total)}</td></tr>
+        <tr><td style="padding-right: 15px">Components</td><td>{gold_html(components_cost, '#888')}</td></tr>
+        <tr><td style="padding-right: 15px">Combine Cost</td><td>{gold_html(base, '#87CEEB')}</td></tr>
+        <tr><td style="padding-right: 15px">Sell Value</td><td>{gold_html(gold['sell'], '#888')}</td></tr>
     </table>
 </div>"""
 
@@ -303,14 +392,15 @@ def _item_gold(PATCH_ID, item, all_items):
 ITEM_SECTIONS["gold"] = _item_gold
 
 
-def build_item_card(PATCH_ID, item, all_items, verso=False):
+def build_item_card(PATCH_ID, item, all_items, verso=False, english_names=False):
     cfg = load_config().get("item_card", {})
     section_order = cfg.get("back" if verso else "front", DEFAULT_ITEM_BACK if verso else DEFAULT_ITEM_FRONT)
+    opts = {"english_names": english_names}
 
     parts = []
     for i, name in enumerate(section_order):
         if name in ITEM_SECTIONS:
-            html = ITEM_SECTIONS[name](PATCH_ID, item, all_items)
+            html = ITEM_SECTIONS[name](PATCH_ID, item, all_items, opts)
             if html:
                 if i > 0:
                     parts.append('<hr style="border: 1px solid #c4c4a5; border-radius: 50px">')
