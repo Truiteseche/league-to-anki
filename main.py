@@ -2,6 +2,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 from utils import load_config, get_patch_id, get_champs_list, get_champs_details, build_champ_card
 from items import get_items_list, build_item_card, ensure_icons
+from tooltips import load_strings, render_champion_tooltips
 import genanki
 import argparse
 
@@ -36,11 +37,17 @@ def build_champions_deck(PATCH_ID, lang, deck_name, whitelist, exclude, workers)
     if exclude:
         champs = [c for c in champs if c["id"].lower() not in exclude and c["name"].lower() not in exclude]
 
+    if load_strings(PATCH_ID, lang) is None:
+        print(f"Warning: no CommunityDragon tooltip data for {lang}, keeping Data Dragon ability descriptions")
+
+    def fetch(champ_id):
+        champ = get_champs_details(PATCH_ID, lang, champ_id)
+        # The game's own ability tooltips: values per rank, AD/AP scalings...
+        champ["_tooltips"] = render_champion_tooltips(PATCH_ID, lang, champ)
+        return champ
+
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        futures = {
-            executor.submit(get_champs_details, PATCH_ID, lang, champ["id"]): champ
-            for champ in champs
-        }
+        futures = {executor.submit(fetch, champ["id"]): champ for champ in champs}
         for future in tqdm(as_completed(futures), total=len(futures), desc="Fetching champions"):
             champ = futures[future]
             try:
@@ -55,7 +62,10 @@ def build_champions_deck(PATCH_ID, lang, deck_name, whitelist, exclude, workers)
 
             deck.add_note(genanki.Note(
                 model=champCardModel,
-                fields=[build_champ_card(PATCH_ID, detailedChamp, False), build_champ_card(PATCH_ID, detailedChamp, True)],
+                fields=[
+                    build_champ_card(PATCH_ID, detailedChamp, False),
+                    build_champ_card(PATCH_ID, detailedChamp, True),
+                ],
                 tags=tags,
                 guid=genanki.guid_for("lol-champion", champ["id"]),
             ))
@@ -127,7 +137,9 @@ def main():
             args.workers,
         )
         out = f"{base}_champions.apkg"
-        genanki.Package(deck).write_to_file(out)
+        package = genanki.Package(deck)
+        package.media_files = ensure_icons()  # stat icons used in ability tooltips
+        package.write_to_file(out)
         print(f"Wrote {len(deck.notes)} champion cards to {out}")
 
     if not onlyChamps:

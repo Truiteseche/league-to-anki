@@ -40,6 +40,10 @@ Below is a list of the languages supported by Data Dragon, which you can also re
 
 Stat and gold icons on item cards come from [CommunityDragon](https://www.communitydragon.org/); they are downloaded once into `.cache/icons` and bundled into the items `.apkg`, so they work offline.
 
+Cards adapt to the screen size: up to 700px wide on a computer, and a compact layout without horizontal scrolling on phones (AnkiDroid, AnkiMobile) or a narrow Anki window.
+
+Data Dragon prints the values the game computes at runtime (level ranges, stat scalings, melee/ranged values, item cooldowns) as `0`, and its champion ability descriptions are short summaries without numbers. Item descriptions and champion abilities are therefore rebuilt from the game's own tooltip templates and data, also from CommunityDragon: values per rank (`35/60/85/110/135`), AD/AP and other stat scalings with their icons, level-based values, melee/ranged values. Ability headers also show cooldown, cost and range. This needs about 50 MB per patch and language plus one small file per champion, downloaded once and cached in `.cache`. When an item or ability uses something this does not understand (mostly values only known during a game, such as stacks), its Data Dragon text is kept.
+
 ## Usage
 
 ```bash

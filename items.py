@@ -1,5 +1,6 @@
 import re
-from utils import http_get_json, http_get_file, load_config, CACHE_DIR
+from utils import http_get_json, http_get_file, load_config, wrap_card, colorize_riot_tags, CACHE_DIR
+from tooltips import load_game_data, render_item_description, text_icon_sources
 
 CDRAGON_STATS_URL = (
     "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/"
@@ -43,12 +44,12 @@ def _stat_media_name(icon):
 
 
 def ensure_icons():
-    """Download stat and gold icons into the cache. Returns their paths for genanki media_files."""
-    paths = [str(http_get_file(GOLD_ICON_URL, ICONS_DIR / GOLD_ICON))]
-    for icon in sorted(set(STAT_ICONS.values())):
-        dest = ICONS_DIR / _stat_media_name(icon)
-        paths.append(str(http_get_file(f"{CDRAGON_STATS_URL}{icon}.png", dest)))
-    return paths
+    """Download stat, gold and tooltip icons into the cache. Returns their paths for genanki media_files."""
+    sources = {GOLD_ICON: GOLD_ICON_URL}
+    for icon in STAT_ICONS.values():
+        sources[_stat_media_name(icon)] = f"{CDRAGON_STATS_URL}{icon}.png"
+    sources.update(dict(text_icon_sources()))
+    return [str(http_get_file(url, ICONS_DIR / name)) for name, url in sorted(sources.items())]
 
 
 def _icon_img(filename, size=16):
@@ -120,6 +121,17 @@ def get_items_list(PATCH_ID, lang):
             continue
         item["_id"] = item_id
         items.append(item)
+
+    # Data Dragon prints values computed in game (level ranges, scalings, cooldowns...) as 0:
+    # rebuild those descriptions from the game's own tooltip templates when available.
+    game_data = load_game_data(PATCH_ID, lang)
+    if game_data is None:
+        print(f"Warning: no CommunityDragon tooltip data for {lang}, keeping Data Dragon descriptions")
+    else:
+        for item in items:
+            rebuilt = render_item_description(game_data, item["_id"], item["description"])
+            if rebuilt:
+                item["description"] = rebuilt
 
     return items, raw
 
@@ -196,7 +208,7 @@ def convert_riot_html(description):
                 f'<div style="background: {bg}; border-left: 3px solid {color}; '
                 f'padding: 8px; margin: 8px 0; border-radius: 4px">'
                 f'<strong style="color: {color}; font-size: 15px">{ability_name}</strong>'
-                f'{rest}'
+                f'{" " + rest if rest else ""}'
             )
             section_open = True
         else:
@@ -209,36 +221,7 @@ def convert_riot_html(description):
 
     desc = ''.join(parts_html)
 
-    # Apply color conversions for damage types etc.
-    conversions = [
-        (r'<magicDamage>', '<span style="color: #00BFFF">'),
-        (r'</magicDamage>', '</span>'),
-        (r'<physicalDamage>', '<span style="color: #FF4500">'),
-        (r'</physicalDamage>', '</span>'),
-        (r'<healing>', '<span style="color: #32CD32">'),
-        (r'</healing>', '</span>'),
-        (r'<shield>', '<span style="color: #C0C0C0">'),
-        (r'</shield>', '</span>'),
-        (r'<scaleAP>', '<span style="color: #BA55D3">'),
-        (r'</scaleAP>', '</span>'),
-        (r'<scaleMana>', '<span style="color: #6495ED">'),
-        (r'</scaleMana>', '</span>'),
-        (r'<status>', '<span style="color: #FFA500">'),
-        (r'</status>', '</span>'),
-        (r'<speed>', '<span style="color: #00CED1">'),
-        (r'</speed>', '</span>'),
-        (r'<keyword>', '<strong>'),
-        (r'</keyword>', '</strong>'),
-        (r'<attention>', '<strong>'),
-        (r'</attention>', '</strong>'),
-    ]
-
-    for pattern, replacement in conversions:
-        desc = re.sub(pattern, replacement, desc)
-
-    desc = re.sub(r'</?[A-Z][a-zA-Z0-9]*>', '', desc)
-
-    return desc
+    return colorize_riot_tags(desc)
 
 
 def build_item_tree(item_id, all_items, memo=None):
@@ -285,11 +268,11 @@ def render_tree_html(node, PATCH_ID, depth=0):
         children_parts = []
         for child in node["children"]:
             children_parts.append(render_tree_html(child, PATCH_ID, depth + 1))
-        children_html = f'<div style="padding-left: 24px; border-left: 1px solid #3a3a5c;">{"".join(children_parts)}</div>'
+        children_html = f'<div class="lol-tree-children" style="padding-left: 24px; border-left: 1px solid #3a3a5c;">{"".join(children_parts)}</div>'
 
     return f"""
     <div style="margin: 1px 0">
-        <div style="display: flex; align-items: center; gap: 8px; padding: 3px 0">
+        <div class="lol-tree-row" style="display: flex; align-items: center; gap: 8px; padding: 3px 0">
             <img src="{img}" style="width: 24px; height: 24px; border-radius: 3px">
             <span style="color: #e8e0d0; font-size: 14px">{node['name']}</span>
             <span style="font-size: 14px">{gold_html(node['total'])}</span>
@@ -316,7 +299,7 @@ def _item_stats(PATCH_ID, item, all_items, opts):
             f"<td style='color: #87CEEB'>{name}</td></tr>"
         )
     return f"""
-<div style="padding: 10px">
+<div class="lol-section" style="padding: 10px">
     <h3 style="color: #d39542; margin-block: 5px">Stats</h3>
     <table style="color: #fff4bf; border-collapse: collapse">{"".join(rows)}</table>
 </div>"""
@@ -333,7 +316,7 @@ def _item_header(PATCH_ID, item, all_items, opts):
         en_html = f' <span style="color: #a09a8a; font-size: 16px; font-weight: normal">({en_name})</span>'
     return f"""
 <div style="text-align: center">
-    <img src="{img}" style="border-radius: 6px; width: 64px; height: 64px">
+    <img class="lol-item-icon" src="{img}" style="border-radius: 6px; width: 64px; height: 64px">
     <h2 style="color: #d39542; margin-block: 10px">{item['name']}{en_html}</h2>
     <div style="font-size: 20px">{gold_html(item['gold']['total'], size=20)}</div>
 </div>"""
@@ -347,7 +330,7 @@ def _item_description(PATCH_ID, item, all_items, opts):
     if not description_html:
         return ""
     return f"""
-<div style="padding: 10px">
+<div class="lol-section" style="padding: 10px">
     <h3 style="color: #d39542; margin-block: 5px">Description</h3>
     <div style="color: #fff4bf; line-height: 1.5">{description_html}</div>
 </div>"""
@@ -363,7 +346,7 @@ def _item_build_path(PATCH_ID, item, all_items, opts):
     tree = build_item_tree(item["_id"], all_items)
     tree_html = render_tree_html(tree, PATCH_ID)
     return f"""
-<div style="padding: 10px">
+<div class="lol-section" style="padding: 10px">
     <h3 style="color: #d39542; margin-block: 5px">Build Path</h3>
     <div style="padding: 4px 0">{tree_html}</div>
 </div>"""
@@ -378,7 +361,7 @@ def _item_gold(PATCH_ID, item, all_items, opts):
     base = gold["base"]
     components_cost = total - base
     return f"""
-<div style="padding: 10px">
+<div class="lol-section" style="padding: 10px">
     <h3 style="color: #d39542; margin-block: 5px">Gold</h3>
     <table style="color: #fff4bf; border-collapse: collapse">
         <tr><td style="padding-right: 15px">Total</td><td>{gold_html(total)}</td></tr>
@@ -406,7 +389,4 @@ def build_item_card(PATCH_ID, item, all_items, verso=False, english_names=False)
                     parts.append('<hr style="border: 1px solid #c4c4a5; border-radius: 50px">')
                 parts.append(html)
 
-    return f"""
-<div style="text-align: left; background-color: #221f40; padding: 10px; border-radius: 8px; width: 700px; margin: 25px auto; border: 1px solid #c4c4a5">
-    {"".join(parts)}
-</div>"""
+    return wrap_card(parts)
